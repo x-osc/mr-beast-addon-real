@@ -5,7 +5,7 @@ import meteordevelopment.meteorclient.addons.GithubRepo;
 import meteordevelopment.meteorclient.addons.MeteorAddon;
 import meteordevelopment.meteorclient.systems.modules.Category;
 import meteordevelopment.meteorclient.systems.modules.Modules;
-import mister.breast.addon.modules.ModuleExample;
+import mister.breast.addon.modules.EvenBetterAutoSign;
 
 import org.slf4j.Logger;
 
@@ -17,7 +17,7 @@ public class MrBeastAddon extends MeteorAddon {
     public void onInitialize() {
         LOG.info("Initializing Mr Beast Meteor Addon (Real) (Not Clickbait)");
 
-        Modules.get().add(new ModuleExample());
+        Modules.get().add(new EvenBetterAutoSign());
     }
 
     @Override
