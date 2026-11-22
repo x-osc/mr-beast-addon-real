@@ -14,6 +14,7 @@ import meteordevelopment.meteorclient.mixin.AbstractSignEditScreenAccessor;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.Utils;
+import meteordevelopment.meteorclient.utils.misc.Keybind;
 import meteordevelopment.meteorclient.utils.misc.MeteorStarscript;
 import meteordevelopment.meteorclient.utils.player.FindItemResult;
 import meteordevelopment.meteorclient.utils.player.InvUtils;
@@ -46,7 +47,7 @@ import java.util.List;
 
 public class EvenBetterAutoSign extends Module {
     final SettingGroup sgSign = settings.createGroup("Normal Sign Text");
-    final SettingGroup sgHang = settings.createGroup("Hanging Sign Text");
+    final SettingGroup sgPreset = settings.createGroup("Presets");
     final SettingGroup sgSignAura = settings.createGroup("Sign Aura");
     final SettingGroup sgExtra = settings.createGroup("Visible");
     private final SettingGroup sgPlace = settings.createGroup("Auto Place");
@@ -85,30 +86,50 @@ public class EvenBetterAutoSign extends Module {
             .defaultValue(false)
             .build()
     );
-    private final Setting<Boolean> differentHangingText = sgExtra.add(new BoolSetting.Builder()
-            .name("different-hanging-text")
-            .description("Use separate text for hanging signs instead of the normal sign text.")
+    private final Setting<Boolean> usePresets = sgPreset.add(new BoolSetting.Builder()
+            .name("use-presets")
+            .description("Use the preset list for sign text instead of the line settings (back side still uses line settings)")
             .defaultValue(false)
+            .build()
+    );
+    private final Setting<List<String>> presets = sgPreset.add(new StringListSetting.Builder()
+            .name("presets")
+            .description("One sign preset per entry, separate sign lines with | character")
+            .defaultValue("|||", "{player}|was|here|{datetime()}", ":3 :3 :3 :3 :3 :3 :3|:3 :3 :3 :3 :3 :3 :3|:3 :3 :3 :3 :3 :3 :3|:3 :3 :3 :3 :3 :3 :3")
+            .visible(usePresets::get)
+            .build()
+    );
+    @SuppressWarnings("unused")
+	private final Setting<Keybind> nextPreset = sgPreset.add(new KeybindSetting.Builder()
+            .name("next-preset-bind")
+            .description("Switches to the next preset")
+            .defaultValue(Keybind.none())
+            .action(this::cyclePreset)
+            .visible(usePresets::get)
             .build()
     );
     private final Setting<String> lineOne = sgSign.add(new StringSetting.Builder()
             .name("line-one")
-            .defaultValue("")
+            .defaultValue("{player}")
+            .visible(() -> !usePresets.get())
             .build()
     );
     private final Setting<String> lineTwo = sgSign.add(new StringSetting.Builder()
             .name("line-two")
-            .defaultValue("")
+            .defaultValue("was here")
+            .visible(() -> !usePresets.get())
             .build()
     );
     private final Setting<String> lineThree = sgSign.add(new StringSetting.Builder()
             .name("line-three")
             .defaultValue("")
+            .visible(() -> !usePresets.get())
             .build()
     );
     private final Setting<String> lineFour = sgSign.add(new StringSetting.Builder()
             .name("line-four")
-            .defaultValue("")
+            .defaultValue("{datetime()}")
+            .visible(() -> !usePresets.get())
             .build()
     );
     private final Setting<String> lineOnedif = sgSign.add(new StringSetting.Builder()
@@ -133,54 +154,6 @@ public class EvenBetterAutoSign extends Module {
             .name("rear-line-four")
             .defaultValue("")
             .visible(differentText::get)
-            .build()
-    );
-    private final Setting<String> HlineOne = sgHang.add(new StringSetting.Builder()
-            .name("line-one")
-            .defaultValue("")
-            .visible(differentHangingText::get)
-            .build()
-    );
-    private final Setting<String> HlineTwo = sgHang.add(new StringSetting.Builder()
-            .name("line-two")
-            .defaultValue("")
-            .visible(differentHangingText::get)
-            .build()
-    );
-    private final Setting<String> HlineThree = sgHang.add(new StringSetting.Builder()
-            .name("line-three")
-            .defaultValue("")
-            .visible(differentHangingText::get)
-            .build()
-    );
-    private final Setting<String> HlineFour = sgHang.add(new StringSetting.Builder()
-            .name("line-four")
-            .defaultValue("")
-            .visible(differentHangingText::get)
-            .build()
-    );
-    private final Setting<String> HlineOnedif = sgHang.add(new StringSetting.Builder()
-            .name("rear-line-one")
-            .defaultValue("")
-            .visible(() -> differentHangingText.get() && differentText.get())
-            .build()
-    );
-    private final Setting<String> HlineTwodif = sgHang.add(new StringSetting.Builder()
-            .name("rear-line-two")
-            .defaultValue("")
-            .visible(() -> differentHangingText.get() && differentText.get())
-            .build()
-    );
-    private final Setting<String> HlineThreedif = sgHang.add(new StringSetting.Builder()
-            .name("rear-line-three")
-            .defaultValue("")
-            .visible(() -> differentHangingText.get() && differentText.get())
-            .build()
-    );
-    private final Setting<String> HlineFourdif = sgHang.add(new StringSetting.Builder()
-            .name("rear-line-four")
-            .defaultValue("")
-            .visible(() -> differentHangingText.get() && differentText.get())
             .build()
     );
     private final Setting<Boolean> signAura = sgSignAura.add(new BoolSetting.Builder()
@@ -242,6 +215,7 @@ public class EvenBetterAutoSign extends Module {
     private Direction lastPlacedSide = Direction.UP;
     private int placeTimer = 0;
     private boolean interactingsign = false;
+    private int presetIndex = 0;
 
     public EvenBetterAutoSign() {
         super(MrBeastAddon.CATEGORY, "even-better-auto-sign", "Automatically writes signs and can dye them as well. Credits to MeteorTweaks for the original!");
@@ -321,6 +295,28 @@ public class EvenBetterAutoSign extends Module {
         InvUtils.swap(oldSlot, true);
     }
 
+    private void cyclePreset() {
+        if (!usePresets.get() || presets.get().isEmpty()) return;
+        presetIndex = (presetIndex + 1) % presets.get().size();
+        info("Sign preset %d/%d: %s", presetIndex + 1, presets.get().size(), presets.get().get(presetIndex));
+    }
+
+    private String presetLine(int i) {
+        List<String> list = presets.get();
+        if (list.isEmpty()) return "";
+        String[] parts = list.get(Math.min(presetIndex, list.size() - 1)).split("\\|", -1);
+        return i < parts.length ? parts[i].trim() : "";
+    }
+
+    private String frontText(int i) {
+        if (usePresets.get()) return presetLine(i);
+        return List.of(lineOne, lineTwo, lineThree, lineFour).get(i).get();
+    }
+
+    private String rearText(int i) {
+        return List.of(lineOnedif, lineTwodif, lineThreedif, lineFourdif).get(i).get();
+    }
+
     @EventHandler
     private void onBlockPlace(PacketEvent.Send event) {
         if (mc.level == null || !autoPlace.get() || interactingsign) return;
@@ -379,17 +375,14 @@ public class EvenBetterAutoSign extends Module {
 
         SignBlockEntity sign = ((AbstractSignEditScreenAccessor) event.screen).meteor$getSign();
         BlockPos pos = sign.getBlockPos();
-        boolean isHanging = differentHangingText.get()
-                && mc.level.getBlockState(pos).getBlock().asItem() instanceof HangingSignItem;
-
         boolean isFront = (editRearPos == null || !editRearPos.equals(pos));
 
         if (isFront) {
             List<String> lines = List.of(
-                    MeteorStarscript.run(MeteorStarscript.compile(isHanging ? HlineOne.get() : lineOne.get())),
-                    MeteorStarscript.run(MeteorStarscript.compile(isHanging ? HlineTwo.get() : lineTwo.get())),
-                    MeteorStarscript.run(MeteorStarscript.compile(isHanging ? HlineThree.get() : lineThree.get())),
-                    MeteorStarscript.run(MeteorStarscript.compile(isHanging ? HlineFour.get() : lineFour.get()))
+                    MeteorStarscript.run(MeteorStarscript.compile(frontText(0))),
+                    MeteorStarscript.run(MeteorStarscript.compile(frontText(1))),
+                    MeteorStarscript.run(MeteorStarscript.compile(frontText(2))),
+                    MeteorStarscript.run(MeteorStarscript.compile(frontText(3)))
             );
 
             mc.player.connection.send(new ServerboundSignUpdatePacket(
@@ -423,10 +416,10 @@ public class EvenBetterAutoSign extends Module {
             boolean diff = differentText.get();
 
             List<String> backLines = List.of(
-                    MeteorStarscript.run(MeteorStarscript.compile(isHanging ? (diff ? HlineOnedif.get() : HlineOne.get()) : (diff ? lineOnedif.get() : lineOne.get()))),
-                    MeteorStarscript.run(MeteorStarscript.compile(isHanging ? (diff ? HlineTwodif.get() : HlineTwo.get()) : (diff ? lineTwodif.get() : lineTwo.get()))),
-                    MeteorStarscript.run(MeteorStarscript.compile(isHanging ? (diff ? HlineThreedif.get() : HlineThree.get()) : (diff ? lineThreedif.get() : lineThree.get()))),
-                    MeteorStarscript.run(MeteorStarscript.compile(isHanging ? (diff ? HlineFourdif.get() : HlineFour.get()) : (diff ? lineFourdif.get() : lineFour.get())))
+                    MeteorStarscript.run(MeteorStarscript.compile(diff ? rearText(0) : frontText(0))),
+                    MeteorStarscript.run(MeteorStarscript.compile(diff ? rearText(1) : frontText(1))),
+                    MeteorStarscript.run(MeteorStarscript.compile(diff ? rearText(2) : frontText(2))),
+                    MeteorStarscript.run(MeteorStarscript.compile(diff ? rearText(3) : frontText(3)))
             );
 
             mc.player.connection.send(new ServerboundSignUpdatePacket(

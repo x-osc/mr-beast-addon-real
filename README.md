@@ -1,2 +1,8 @@
-# mr beast meteor addon
-mr beast meteor addon
+# mr beast hack (real)
+mr beast hack (real)
+
+### modules
+`EvenBetterAutoSign`
+
+### other stuff
+`datetime()` starscript function
