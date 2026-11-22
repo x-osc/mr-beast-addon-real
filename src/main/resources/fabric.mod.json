@@ -1,27 +1,27 @@
 {
   "schemaVersion": 1,
-  "id": "addon-template",
+  "id": "mr-beast-meteor-addon",
   "version": "${version}",
-  "name": "Addon Template",
-  "description": "An addon template for Meteor Client addons.",
+  "name": "mr beast meteor addon (real) (not clickbait)",
+  "description": "mr beast meteor addon",
   "authors": [
-    "seasnail"
+    "x-osc"
   ],
   "contact": {
-    "sources": "https://github.com/MeteorDevelopment/meteor-addon-template"
+    "sources": "https://github.com/x-osc/mr-beast-addon-real"
   },
   "icon": "assets/template/icon.png",
   "environment": "client",
   "entrypoints": {
     "meteor": [
-      "com.example.addon.AddonTemplate"
+      "mister.breast.addon.MrBeastAddon"
     ]
   },
   "mixins": [
-    "addon-template.mixins.json"
+    "mrbreast.mixins.json"
   ],
   "custom": {
-    "meteor-client:color": "225,25,25",
+    "meteor-client:color": "109,255,40",
     "modmenu": {
       "parent": {
         "id": "meteor-client"

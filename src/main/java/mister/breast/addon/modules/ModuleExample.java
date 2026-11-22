@@ -1,6 +1,5 @@
-package com.example.addon.modules;
+package mister.breast.addon.modules;
 
-import com.example.addon.AddonTemplate;
 import meteordevelopment.meteorclient.events.render.Render3DEvent;
 import meteordevelopment.meteorclient.renderer.ShapeMode;
 import meteordevelopment.meteorclient.settings.ColorSetting;
@@ -11,6 +10,7 @@ import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.render.color.Color;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
 import meteordevelopment.orbit.EventHandler;
+import mister.breast.addon.MrBeastAddon;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
 
@@ -43,12 +43,12 @@ public class ModuleExample extends Module {
      * The {@code name} parameter should be in kebab-case.
      */
     public ModuleExample() {
-        super(AddonTemplate.CATEGORY, "world-origin", "An example module that highlights the center of the world.");
+        super(MrBeastAddon.CATEGORY, "world-origin", "An example module that highlights the center of the world.");
     }
 
     /**
      * Example event handling method.
-     * Requires {@link AddonTemplate#getPackage()} to be setup correctly, otherwise the game will crash whenever the module is enabled.
+     * Requires {@link MrBeastAddon#getPackage()} to be setup correctly, otherwise the game will crash whenever the module is enabled.
      */
     @EventHandler
     private void onRender3d(Render3DEvent event) {
