@@ -4,10 +4,11 @@ plugins {
 
 val archivesBaseName = providers.gradleProperty("archives_base_name").get()
 val mavenGroup = providers.gradleProperty("maven_group").get()
+val versionSuffix = providers.gradleProperty("version_suffix").getOrElse("")
 
 base {
     archivesName = archivesBaseName
-    version = libs.versions.mod.version.get()
+    version = providers.gradleProperty("version").orElse(libs.versions.mod.version).get() + versionSuffix
     group = mavenGroup
 }
 

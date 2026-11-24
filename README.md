@@ -2,9 +2,9 @@
 mr beast hack (real) (not virus)
 
 ### modules
-`EvenBetterAutoSign`
-`AutoPortal`
-`PortalTrapper`
+`EvenBetterAutoSign`  
+`AutoPortal`  
+`PortalTrapper`  
 
 ### other stuff
 `datetime()` starscript function
