@@ -1,5 +1,5 @@
-# mr beast hack (real)
-mr beast hack (real)
+# mr beast hack (real) (not virus)
+mr beast hack (real) (not virus)
 
 ### modules
 `EvenBetterAutoSign`

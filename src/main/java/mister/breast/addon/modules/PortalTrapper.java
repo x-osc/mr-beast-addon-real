@@ -1,10 +1,13 @@
 package mister.breast.addon.modules;
 
+import meteordevelopment.meteorclient.events.render.Render3DEvent;
 import meteordevelopment.meteorclient.events.world.TickEvent;
+import meteordevelopment.meteorclient.renderer.ShapeMode;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.player.FindItemResult;
 import meteordevelopment.meteorclient.utils.player.InvUtils;
+import meteordevelopment.meteorclient.utils.render.color.SettingColor;
 import meteordevelopment.orbit.EventHandler;
 import mister.breast.addon.MrBeastAddon;
 import mister.breast.addon.utils.PlaceUtil;
@@ -13,6 +16,8 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.NetherPortalBlock;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.*;
@@ -25,35 +30,68 @@ public class PortalTrapper extends Module {
     private static final int COOLDOWN_TICKS = 100;
     private static final int SCAN_INTERVAL = 5;
 
-    private final SettingGroup sgGeneral = settings.getDefaultGroup();
+    private final SettingGroup sgPlace = settings.createGroup("Placement");
+    private final SettingGroup sgRender = settings.createGroup("Render");
 
-    private final Setting<List<Block>> blocks = sgGeneral.add(new BlockListSetting.Builder()
-            .name("blocks")
-            .description("Blocks to trap with. Any of these found in your hotbar is used.")
-            .defaultValue(List.of(Blocks.OBSIDIAN, Blocks.CRYING_OBSIDIAN))
-            .build());
-    private final Setting<Double> placeRange = sgGeneral.add(new DoubleSetting.Builder()
-            .name("place-range")
-            .description("Maximum distance to a block being placed.")
-            .defaultValue(4).min(1).sliderRange(1, 6)
-            .build());
-    private final Setting<Integer> blocksPerTick = sgGeneral.add(new IntSetting.Builder()
-            .name("blocks-per-tick")
-            .description("Blocks placed per tick.")
-            .defaultValue(1).min(1).sliderMax(4)
-            .build());
-    private final Setting<Integer> delay = sgGeneral.add(new IntSetting.Builder()
-            .name("delay")
-            .description("Ticks to wait between placement steps.")
-            .defaultValue(0).min(0).sliderMax(10)
-            .build());
-    private final Setting<Boolean> rotate = sgGeneral.add(new BoolSetting.Builder()
-            .name("rotate")
-            .description("Look at blocks while placing.")
+    private final Setting<Boolean> place = sgPlace.add(new BoolSetting.Builder()
+            .name("place")
+            .description("Place blocks to trap portals, turn off to use the module only for highlighting")
             .defaultValue(true)
+            .build());
+    private final Setting<List<Block>> blocks = sgPlace.add(new BlockListSetting.Builder()
+            .name("blocks")
+            .description("Blocks to trap with")
+            .defaultValue(List.of(Blocks.OBSIDIAN, Blocks.CRYING_OBSIDIAN))
+            .visible(place::get)
+            .build());
+    private final Setting<Double> placeRange = sgPlace.add(new DoubleSetting.Builder()
+            .name("place-range")
+            .description("Maximum distance to a block being placed")
+            .defaultValue(4).min(1).sliderRange(1, 6)
+            .visible(place::get)
+            .build());
+    private final Setting<Integer> blocksPerTick = sgPlace.add(new IntSetting.Builder()
+            .name("blocks-per-tick")
+            .description("Blocks placed per tick")
+            .defaultValue(1).min(1).sliderMax(4)
+            .visible(place::get)
+            .build());
+    private final Setting<Integer> delay = sgPlace.add(new IntSetting.Builder()
+            .name("delay")
+            .description("Ticks to wait between placement steps")
+            .defaultValue(0).min(0).sliderMax(10)
+            .visible(place::get)
+            .build());
+    private final Setting<Boolean> rotate = sgPlace.add(new BoolSetting.Builder()
+            .name("rotate")
+            .description("Look at blocks while placing")
+            .defaultValue(true)
+            .visible(place::get)
+            .build());
+
+    private final Setting<Boolean> highlight = sgRender.add(new BoolSetting.Builder()
+            .name("highlight-untrapped")
+            .description("Highlights portals in render distance that aren't trapped yet")
+            .defaultValue(true)
+            .build());
+    private final Setting<ShapeMode> shapeMode = sgRender.add(new EnumSetting.Builder<ShapeMode>()
+            .name("shape-mode")
+            .defaultValue(ShapeMode.Both)
+            .visible(highlight::get)
+            .build());
+    private final Setting<SettingColor> sideColor = sgRender.add(new ColorSetting.Builder()
+            .name("side-color")
+            .defaultValue(new SettingColor(255, 60, 60, 40))
+            .visible(highlight::get)
+            .build());
+    private final Setting<SettingColor> lineColor = sgRender.add(new ColorSetting.Builder()
+            .name("line-color")
+            .defaultValue(new SettingColor(255, 60, 60, 255))
+            .visible(highlight::get)
             .build());
 
     private List<Portal> portals = List.of();
+    private List<Portal> untrapped = List.of();
     private final Map<BlockPos, Integer> attempts = new HashMap<>();
     private final Map<BlockPos, Integer> nextTry = new HashMap<>();
     private int tick, timer;
@@ -70,6 +108,7 @@ public class PortalTrapper extends Module {
 
     private void reset() {
         portals = List.of();
+        untrapped = List.of();
         attempts.clear();
         nextTry.clear();
         tick = 0;
@@ -80,6 +119,13 @@ public class PortalTrapper extends Module {
     private void onTick(TickEvent.Pre event) {
         if (mc.player == null || mc.level == null) return;
         tick++;
+
+        if (tick % 10 == 0) untrapped = highlight.get() ? scanUntrapped() : List.of();
+
+        if (!place.get()) {
+            portals = List.of();
+            return;
+        }
 
         if (tick % SCAN_INTERVAL == 0) portals = findPortals();
         if (timer-- > 0) return;
@@ -126,7 +172,63 @@ public class PortalTrapper extends Module {
         timer = delay.get();
     }
 
-    private List<BlockPos> trapPositions(Portal p) {
+    @EventHandler
+    private void onRender(Render3DEvent event) {
+        if (!highlight.get()) return;
+        for (Portal p : untrapped) {
+            event.renderer.box(
+                    p.min().getX(), p.min().getY(), p.min().getZ(),
+                    p.max().getX() + 1, p.max().getY() + 1, p.max().getZ() + 1,
+                    sideColor.get(), lineColor.get(), shapeMode.get(), 0);
+        }
+    }
+
+    private List<Portal> scanUntrapped() {
+        int rd = mc.options.getEffectiveRenderDistance();
+        int pcx = mc.player.blockPosition().getX() >> 4;
+        int pcz = mc.player.blockPosition().getZ() >> 4;
+
+        Set<BlockPos> seen = new HashSet<>();
+        List<Portal> result = new ArrayList<>();
+
+        for (int cx = pcx - rd; cx <= pcx + rd; cx++) {
+            for (int cz = pcz - rd; cz <= pcz + rd; cz++) {
+                LevelChunk chunk = mc.level.getChunkSource().getChunkNow(cx, cz);
+                if (chunk == null) continue;
+
+                LevelChunkSection[] sections = chunk.getSections();
+                for (int i = 0; i < sections.length; i++) {
+                    LevelChunkSection section = sections[i];
+                    if (section.hasOnlyAir() || !section.maybeHas(s -> s.is(Blocks.NETHER_PORTAL))) continue;
+
+                    int baseY = (chunk.getMinSectionY() + i) << 4;
+                    for (int x = 0; x < 16; x++) {
+                        for (int y = 0; y < 16; y++) {
+                            for (int z = 0; z < 16; z++) {
+                                if (!section.getBlockState(x, y, z).is(Blocks.NETHER_PORTAL)) continue;
+
+                                BlockPos pos = new BlockPos((cx << 4) + x, baseY + y, (cz << 4) + z);
+                                if (seen.contains(pos)) continue;
+
+                                Portal portal = floodFill(pos, mc.level.getBlockState(pos).getValue(NetherPortalBlock.AXIS), seen);
+                                if (!isTrapped(portal)) result.add(portal);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    private boolean isTrapped(Portal p) {
+        for (BlockPos pos : trapPositions(p)) {
+            if (mc.level.getBlockState(pos).canBeReplaced()) return false;
+        }
+        return true;
+    }
+
+	private List<BlockPos> trapPositions(Portal p) {
         List<BlockPos> list = new ArrayList<>();
         int y = p.min().getY() + (p.max().getY() - p.min().getY()) / 2;
 
