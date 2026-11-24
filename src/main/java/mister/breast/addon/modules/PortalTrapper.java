@@ -38,11 +38,17 @@ public class PortalTrapper extends Module {
             .description("Place blocks to trap portals, turn off to use the module only for highlighting")
             .defaultValue(true)
             .build());
+    private final Setting<Boolean> highlight = sgRender.add(new BoolSetting.Builder()
+            .name("highlight-untrapped")
+            .description("Highlights portals in render distance that aren't trapped with blocks in the list yet")
+            .defaultValue(true)
+            .build());
+
     private final Setting<List<Block>> blocks = sgPlace.add(new BlockListSetting.Builder()
             .name("blocks")
             .description("Blocks to trap with")
             .defaultValue(List.of(Blocks.OBSIDIAN, Blocks.CRYING_OBSIDIAN))
-            .visible(place::get)
+            .visible(() -> place.get() || highlight.get())
             .build());
     private final Setting<Double> placeRange = sgPlace.add(new DoubleSetting.Builder()
             .name("place-range")
@@ -69,11 +75,6 @@ public class PortalTrapper extends Module {
             .visible(place::get)
             .build());
 
-    private final Setting<Boolean> highlight = sgRender.add(new BoolSetting.Builder()
-            .name("highlight-untrapped")
-            .description("Highlights portals in render distance that aren't trapped yet")
-            .defaultValue(true)
-            .build());
     private final Setting<ShapeMode> shapeMode = sgRender.add(new EnumSetting.Builder<ShapeMode>()
             .name("shape-mode")
             .defaultValue(ShapeMode.Both)
@@ -81,12 +82,12 @@ public class PortalTrapper extends Module {
             .build());
     private final Setting<SettingColor> sideColor = sgRender.add(new ColorSetting.Builder()
             .name("side-color")
-            .defaultValue(new SettingColor(255, 60, 60, 40))
+            .defaultValue(new SettingColor(60, 255, 255, 40))
             .visible(highlight::get)
             .build());
     private final Setting<SettingColor> lineColor = sgRender.add(new ColorSetting.Builder()
             .name("line-color")
-            .defaultValue(new SettingColor(255, 60, 60, 255))
+            .defaultValue(new SettingColor(60, 255, 255, 255))
             .visible(highlight::get)
             .build());
 
@@ -223,7 +224,7 @@ public class PortalTrapper extends Module {
 
     private boolean isTrapped(Portal p) {
         for (BlockPos pos : trapPositions(p)) {
-            if (mc.level.getBlockState(pos).canBeReplaced()) return false;
+            if (!blocks.get().contains(mc.level.getBlockState(pos).getBlock())) return false;
         }
         return true;
     }
