@@ -6,6 +6,7 @@ import meteordevelopment.meteorclient.addons.MeteorAddon;
 import meteordevelopment.meteorclient.systems.modules.Category;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.utils.misc.MeteorStarscript;
+import mister.breast.addon.modules.AutoPortal;
 import mister.breast.addon.modules.EvenBetterAutoSign;
 
 import java.time.LocalDateTime;
@@ -23,6 +24,7 @@ public class MrBeastAddon extends MeteorAddon {
         LOG.info("Initializing Mr Beast Meteor Addon (Real) (Not Clickbait)");
 
         Modules.get().add(new EvenBetterAutoSign());
+        Modules.get().add(new AutoPortal());
 
         MeteorStarscript.ss.set("datetime", (ss, argCount) -> {
             String pattern = "yyyy-MM-dd";

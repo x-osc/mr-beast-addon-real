@@ -3,6 +3,7 @@ mr beast hack (real)
 
 ### modules
 `EvenBetterAutoSign`
+`AutoPortal`
 
 ### other stuff
 `datetime()` starscript function
