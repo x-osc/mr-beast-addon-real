@@ -41,7 +41,7 @@ public class PortalTrapper extends Module {
     private final Setting<Boolean> highlight = sgRender.add(new BoolSetting.Builder()
             .name("highlight-untrapped")
             .description("Highlights portals in render distance that aren't trapped with blocks in the list yet")
-            .defaultValue(true)
+            .defaultValue(false)
             .build());
 
     private final Setting<List<Block>> blocks = sgPlace.add(new BlockListSetting.Builder()
