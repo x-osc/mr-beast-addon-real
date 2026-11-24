@@ -6,15 +6,14 @@ import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.player.FindItemResult;
 import meteordevelopment.meteorclient.utils.player.InvUtils;
 import meteordevelopment.meteorclient.utils.player.Rotations;
-import meteordevelopment.meteorclient.utils.player.SwingMode;
 import meteordevelopment.orbit.EventHandler;
 import mister.breast.addon.MrBeastAddon;
+import mister.breast.addon.utils.PlaceUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.HitResult;
@@ -66,30 +65,6 @@ public class AutoPortal extends Module {
 
     public AutoPortal() {
         super(MrBeastAddon.CATEGORY, "auto-portal", "Builds and lights a nether portal in front of you.");
-    }
-
-    // basically so meteor client BlockUtils.place() is DUMB and STUPID and places the block in the wrong location
-    // when there is a replaceable block (e.g grass) behind the targeted location, the block is placed on the
-    // replaceable block instead
-    // bruh
-    private boolean placeObsidian(BlockPos pos, FindItemResult obsidian) {
-        BlockState target = mc.level.getBlockState(pos);
-        if (target.is(Blocks.OBSIDIAN)) return true;
-        if (!target.canBeReplaced()) return false;
-
-        Vec3 hitVec = Vec3.atCenterOf(pos);
-        BlockHitResult hit = new BlockHitResult(hitVec, Direction.UP, pos, false);
-
-        Runnable place = () -> {
-            InvUtils.swap(obsidian.slot(), true);
-            mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, hit);
-            SwingMode.Both.interactSwing(InteractionHand.MAIN_HAND);
-            InvUtils.swapBack();
-        };
-
-        if (rotate.get()) Rotations.rotate(Rotations.getYaw(pos), Rotations.getPitch(pos), place);
-        else place.run();
-        return true;
     }
 
     @Override
@@ -154,7 +129,8 @@ public class AutoPortal extends Module {
             }
 
             for (int i = 0; i < blocksPerTick.get() && !queue.isEmpty(); i++) {
-                if (placeObsidian(queue.peek(), obsidian)) {
+                BlockPos pos = queue.peek();
+                if (mc.level.getBlockState(pos).is(Blocks.OBSIDIAN) || PlaceUtil.place(pos, obsidian, rotate.get(), true)) {
                     queue.poll();
                     stuck = 0;
                 } else {
@@ -171,15 +147,15 @@ public class AutoPortal extends Module {
         }
 
         if (light.get()) {
-            FindItemResult flint = InvUtils.findInHotbar(Items.FLINT_AND_STEEL);
-            if (!flint.found()) {
+            FindItemResult fns = InvUtils.findInHotbar(Items.FLINT_AND_STEEL);
+            if (!fns.found()) {
                 error("No flint and steel in hotbar.");
                 toggle();
                 return;
             }
 
             Runnable ignite = () -> {
-                InvUtils.swap(flint.slot(), true);
+                InvUtils.swap(fns.slot(), true);
                 mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND,
                         new BlockHitResult(Vec3.atCenterOf(lightPos).add(0, 0.5, 0), Direction.UP, lightPos, false));
                 InvUtils.swapBack();

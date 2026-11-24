@@ -128,7 +128,7 @@ public class EvenBetterAutoSign extends Module {
     );
     private final Setting<String> lineFour = sgSign.add(new StringSetting.Builder()
             .name("line-four")
-            .defaultValue("{datetime()}")
+            .defaultValue("{datetime(\"dd-MM-yyyy\")}")
             .visible(() -> !usePresets.get())
             .build()
     );
